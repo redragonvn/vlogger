@@ -1,6 +1,6 @@
-			*******************************
-			***** THC PRIVATE RELEASE *****
-			*******************************
+			***********************************
+			***** THC PUBLIC RELEASE/2003 *****
+			***********************************
 
 				thc-vlogger 2.2
 			Advanced Linux Kernel Keylogger
@@ -17,7 +17,7 @@ o Supported kernel
 
 	Support 2.4.x and 2.6.x kernel (x86 arch)
 	
-	** I need some x86 Linux boxes (ex sparc, ppc, ..) for testing 
+	** I need some non-x86 Linux boxes (ex sparc, ppc, ..) for testing 
 	and ongoing developing vlogger. If you can donate some root access (no 
 	illegal pls) or hardware, please drop a line to me at rd@thc.org **
 
@@ -32,9 +32,9 @@ o Stealth mechanism
 
 	No syscall modifying
 
-	Super User (in the box itself) neither see nor sniff log packets
-		Sniffers such as tcpdump in the box can not see the traffic
-		Bypassing network filtering/firewall rules in the box
+	Local user (including root) could not see keylog packets via network sniffers
+		Sniffers such as tcpdump inside the box can not see the traffics
+		Effective bypassing network filtering/firewall rules as well
 
 	Module hiding (tool/modclean.c)
 		Remove vlogger module from the module list
@@ -89,7 +89,7 @@ o Log data
 
 CONFIGURING & COMPILING
 
-	Please read INSTALL for more detail
+	Please read INSTALL for more details
 
 
 DOCUMENTATION
