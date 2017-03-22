@@ -1,0 +1,92 @@
+#!/bin/sh
+#
+# Copyright (C) 2002-2003 RD <rd@thc.org>
+#
+
+# get user input data
+getdata() {
+	local myvar="$1"
+	shift
+	# print out the message
+	echo -en "$@"
+	read data
+	if [ ! -z "$data" ] ; then
+		eval $myvar="$data"
+	fi
+	echo
+}
+
+clear
+head -10 README
+echo
+cat NOTICE
+echo
+
+KERNELDIR=/lib/modules/`uname -r`/build
+getdata KERNELDIR "Where is the linux source build directory [$KERNELDIR]: "
+
+# check kernel version
+echo -n "Checking kernel version .. "
+cat >conftest.c <<_EOF
+#ifndef KERNEL_VERSION
+#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
+#define KERNVER "LINUX24"
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
+#define KERNVER "LINUX26"
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20)) && (RED_HAT_LINUX_KERNEL == 1)
+#define KERNVER "LINUX24-RH9"
+#endif
+
+int main(void) {
+#ifdef KERNVER	
+	printf(KERNVER);
+	return 0;
+#else 
+	return -1;
+#endif
+}
+_EOF
+
+cc -DMODULE -D__KERNEL__ -include $KERNELDIR/include/linux/version.h conftest.c -o conftest &>/dev/null && KERNELVER=`./conftest` 
+rm -f conftest*
+
+if [ -z "$KERNELVER" ]; then
+	echo "failed."
+	exit -1;
+else
+	echo $KERNELVER
+fi
+
+#KSYMS=/proc/ksyms
+#if [ "$KERNELVER" = "LINUX26" ]; then
+#	KSYMS=/proc/kallsyms
+#fi
+#
+#if [ ! -z "`sed -ne '/kernel_thread_R.*/p'<$KSYMS`" ]; then
+#	MODVER_FLAGS="-DMODVERSIONS -include \$\(MODVER_FILE\)"
+#fi 
+
+# Generate Makefile 
+echo "Generating make.conf"
+sed -e 	"s#^KERNELDIR = \(.*\)#KERNELDIR = $KERNELDIR#; \
+        s#^KERNELVER = \(.*\)#KERNELVER = $KERNELVER#; \
+        s#^MODVER_FLAGS = \(.*\)#MODVER_FLAGS = $MODVER_FLAGS#;" \
+        > make.conf < make.conf.gen || exit $?
+
+MOD_EXT=o
+if [ "$KERNELVER" = "LINUX26" ]; then
+	MOD_EXT=ko
+fi
+
+# Generating vlogconfig
+echo "Generating vlogconfig script"
+sed -e 	"s#^MOD_EXT=\(.*\)#MOD_EXT=$MOD_EXT#;" \
+        > ./vlogconfig< ./vlogconfig.gen || exit $?
+chmod +x vlogconfig
+
+echo "*** Execute 'make' to build vlogger."

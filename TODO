@@ -1,0 +1,4 @@
+- Encrypt log data when sending via network with strong encryption 
+  algorithms (sha1+aes)
+- Full support for non x86 machines
+- Protect against string pattern analysis such as strings, grep, etc 

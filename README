@@ -1,0 +1,108 @@
+			*******************************
+			***** THC PRIVATE RELEASE *****
+			*******************************
+
+				thc-vlogger 2.2
+			Advanced Linux Kernel Keylogger
+
+|=------------------------=[ (C) by RD <rd@thc.org> ]=-----------------------=|
+|=--------------------------=[ The Hacker's Choice ]=-------------------------|
+		 		http://www.thc.org
+
+
+
+FEATURE
+
+o Supported kernel
+
+	Support 2.4.x and 2.6.x kernel (x86 arch)
+	
+	** I need some x86 Linux boxes (ex sparc, ppc, ..) for testing 
+	and ongoing developing vlogger. If you can donate some root access (no 
+	illegal pls) or hardware, please drop a line to me at rd@thc.org **
+
+
+o Log keystrokes of all user sessions
+
+	Console, serial console 
+	Remote sessions (telnet, ssh, etc)
+
+
+o Stealth mechanism
+
+	No syscall modifying
+
+	Super User (in the box itself) neither see nor sniff log packets
+		Sniffers such as tcpdump in the box can not see the traffic
+		Bypassing network filtering/firewall rules in the box
+
+	Module hiding (tool/modclean.c)
+		Remove vlogger module from the module list
+		KSTAT can not detect the removed module
+		
+	Module injection (tool/modinject)
+		Inject vlogger module into another kernel module
+
+
+o Multiple logging modes and methods
+
+	Support three logging modes
+		Switch between logging modes by specific keys sequence
+		Default toggle character is CTRL-]
+
+	Dumb mode
+		Logs all keystrokes
+
+	Smart mode
+		Ability to detect password prompt automatically to log only 
+		sensitive data such as user/password (ssh, telnet, su, sudo, 
+		ftp, ...)
+
+	Normal mode 
+		Stop logging mode
+
+
+o Log methods
+
+	Log to files
+	
+	Remote log over network
+		Transmits log data to a specified machine
+
+
+o Log data
+
+	Separated logging for each tty/session
+		Each tty has their own log buffer
+		Easier to track sessions
+
+	Timestamps logging
+
+	Nearly support all special chars
+		Arrow keys (left, right, up, down), Home, Page Up, Page Down
+		F1 to F12, Shift+F1 to Shift+F12
+		ALT- and CTRL- combinations 
+		Tab, Insert, Delete, End, Backspace, ...
+
+	Support line editing keys included CTRL-U and Backspace
+
+
+CONFIGURING & COMPILING
+
+	Please read INSTALL for more detail
+
+
+DOCUMENTATION
+
+	See doc/vlogger.txt (old doc but still usefull)
+
+
+BUGS REPORT
+
+	Send you bug report to rd@thc.org
+	
+
+GREETS
+	Special thanks to wilkins for SMP test
+	thc, teso, segfault.net, monkey.org, phenoelit, hert, 
+	vnsecurity and all other friends.

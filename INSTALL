@@ -1,0 +1,11 @@
+CONFIGURING & COMPILING
+
+  $ ./configure
+  $ make
+
+  Run vlogconfig to configure vlogger 
+  $ ./vlogconfig
+
+  Use vlogctrl to load/unload vlogger
+  # ./vlogctrl load
+

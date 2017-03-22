@@ -1,0 +1,24 @@
+#
+#  vlogger 2.2
+#  (C) 2002 by RD <rd@thc.org>
+#
+
+# Path to kernel source
+KERNELDIR = /lib/modules/2.6.1-rc1/build
+KERNELVER = LINUX26
+
+MODDEFS = -D__KERNEL__ -DMODULE -D$(KERNELVER)
+# Uncomment the following for debugging
+#MODDEFS += -DDEBUG
+
+MODVER_FILE = $(KERNELDIR)/include/linux/modversions.h
+MODVER_FLAGS = 
+
+MODFLAGS = $(MODVER_FLAGS) -I$(KERNELDIR)/include -I$(KERNELDIR)/include/asm \
+	   -I$(KERNELDIR)/include/asm/mach-default 
+
+CFLAGS = -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fno-strict-aliasing \
+	 -fno-common -pipe -mpreferred-stack-boundary=2 -fomit-frame-pointer 
+
+KCFLAGS = -nostdinc -iwithprefix include 
+
